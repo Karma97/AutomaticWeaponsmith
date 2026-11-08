@@ -50,11 +50,11 @@ namespace AutomaticWeaponsmith
         }
     }
 
-    // Pro Slot vier Bestwerte, je nachdem was mindestens drinstecken muss (Index = Bitmaske):
-    // 0 = egal, 1 = mit Visier, 2 = mit Lampe, 3 = mit beidem. null = in diesem Slot nicht möglich.
+    // Pro Slot acht Bestwerte (Index = Bitmaske): 1 = mit Visier, 2 = mit Lampe, 4 = ohne neu eingebautes Visier.
+    // null = in diesem Slot nicht möglich.
     public class SlotResult
     {
-        public readonly SlotChoice[] Best = new SlotChoice[4];
+        public readonly SlotChoice[] Best = new SlotChoice[8];
 
         public SlotChoice Any
         {
@@ -119,6 +119,7 @@ namespace AutomaticWeaponsmith
         private readonly PriceData _prices;
         private readonly bool _requireLight;        // Es muss eine Lampe dran sein
         private readonly bool _noIronSights;        // Kimme/Korn nie einbauen (außer in Pflicht-Slots)
+        private readonly bool _noMountStacks;       // Keine neue Halterung auf einer anderen Halterung
         private readonly Dictionary<MongoID, Purchase> _purchaseCache = new Dictionary<MongoID, Purchase>();
 
         // Zwischenergebnisse, die über mehrere Rechenläufe gültig bleiben (siehe Lookup).
@@ -127,6 +128,7 @@ namespace AutomaticWeaponsmith
 
         private Weights _weights;
         private HashSet<MongoID> _banned = new HashSet<MongoID>();
+        private Weapon _weapon;
 
         private class MemoEntry
         {
@@ -137,11 +139,12 @@ namespace AutomaticWeaponsmith
 
         public BuildOptimizer(EditBuildManipulation manipulation, PartIndex index, Dictionary<MongoID, int> stash,
             bool fleaAvailable, bool allowLaunchers, int requiredSightRank, int minMagazine, MongoID? requiredSightTemplate,
-            PriceData prices, bool requireLight, bool noIronSights)
+            PriceData prices, bool requireLight, bool noIronSights, bool noMountStacks)
         {
             _prices = prices;
             _requireLight = requireLight;
             _noIronSights = noIronSights;
+            _noMountStacks = noMountStacks;
             _requiredSightTemplate = requiredSightTemplate;
             _manipulation = manipulation;
             _index = index;
@@ -161,7 +164,10 @@ namespace AutomaticWeaponsmith
 
         private const int SightBit = 1;
         private const int LightBit = 2;
-        private const int FilledBit = 4; // nur intern: mindestens ein Unter-Slot belegt
+        private const int FilledBit = 4;   // nur intern: mindestens ein Unter-Slot belegt
+        private const int AddedSightBit = 8;  // ein neu eingebautes Visier steckt drin
+        private const int KeptSightBit = 16;  // ein vorhandenes Visier erfüllt die Regel schon
+        private const int NoAddedSightIndex = 4; // Index-Bit in SlotResult.Best
 
         private int RequiredMask => (SightRuleActive ? SightBit : 0) | (_requireLight ? LightBit : 0);
 
@@ -179,6 +185,14 @@ namespace AutomaticWeaponsmith
             "626becf9582c3e319310b837", // Insight WMX200
             "6272370ee4013c5d7e31f418", // Olight Baldr Pro
             "6272379924e29f06af4d5ecb", // Olight Baldr Pro (Tan)
+        };
+
+        // Diese Visiere wählt der Mod nie von sich aus. Wer sie schon auf der Waffe hat, behält sie.
+        private static readonly HashSet<string> NeverPickedSights = new HashSet<string>
+        {
+            "591c4efa86f7741030027726", // Axion Kobra EKP-8-18
+            "5947db3f86f77447880cf76f", // Axion Kobra EKP-8-02 (Dovetail)
+            "6544d4187c5457729210d277", // Axion Kobra EKP-1S-03 (Dovetail)
         };
 
         public static bool IsLight(Item item) =>
@@ -203,6 +217,7 @@ namespace AutomaticWeaponsmith
         {
             _weights = weights;
             _banned = banned;
+            _weapon = weapon;
             if (_memoWeights != weights.ToString())
             {
                 _memo.Clear();
@@ -261,6 +276,10 @@ namespace AutomaticWeaponsmith
                         {
                             continue;
                         }
+                        if (TwoSights(kv.Key, variant.Mask))
+                        {
+                            continue;
+                        }
                         int mask = kv.Key | variant.Mask | (variant.Part != null ? FilledBit : 0);
                         var sum = kv.Value;
                         var candidate = new SlotChoice
@@ -281,6 +300,30 @@ namespace AutomaticWeaponsmith
                 states = next;
             }
             return states;
+        }
+
+        // Manche Teile vertragen sich laut Spiel nicht mit der Waffe selbst (z. B. CQR-Griff und AK-74).
+        private bool ConflictsWithWeapon(Item part)
+        {
+            var ofPart = part.Template.ConflictingItems;
+            var ofWeapon = _weapon.Template.ConflictingItems;
+            return (ofPart != null && ofPart.Contains(_weapon.TemplateId.ToString()))
+                || (ofWeapon != null && ofWeapon.Contains(part.TemplateId.ToString()));
+        }
+
+        // Höchstens ein neues Visier, und keins zusätzlich zu einem vorhandenen, das die Regel schon erfüllt.
+        private static bool TwoSights(int a, int b)
+        {
+            return ((a & AddedSightBit) != 0 && (b & (AddedSightBit | KeptSightBit)) != 0)
+                || ((a & KeptSightBit) != 0 && (b & AddedSightBit) != 0);
+        }
+
+        // Passt die Variante zu diesem Index in SlotResult.Best?
+        private static bool Qualifies(SlotChoice choice, int index)
+        {
+            int required = index & (SightBit | LightBit);
+            return (choice.Mask & required) == required
+                && ((index & NoAddedSightIndex) == 0 || (choice.Mask & AddedSightBit) == 0);
         }
 
         public bool ContainsLight(SlotChoice choice) => choice.Flatten().Any(c => c.Part != null && IsLight(c.Part));
@@ -429,6 +472,12 @@ namespace AutomaticWeaponsmith
                 contained = null;
             }
 
+            // Keine Visier-Regel aktiv: Vorhandene Visiere in freiwilligen Slots müssen nicht bleiben.
+            if (!SightRuleActive && contained != null && SightRank(contained) > 0 && !slot.Required)
+            {
+                contained = null;
+            }
+
             // Slot muss belegt bleiben, wenn er Pflicht ist oder im aktuellen Build schon belegt ist.
             bool mustFill = slot.Required || contained != null;
 
@@ -439,7 +488,12 @@ namespace AutomaticWeaponsmith
             }
 
             var empty = new SlotChoice { Slot = slot, Part = null, Source = PartSource.Stash };
-            var result = new SlotResult { Any = mustFill ? null : empty };
+            var result = new SlotResult();
+            if (!mustFill)
+            {
+                result.Any = empty;
+                result.Best[NoAddedSightIndex] = empty;
+            }
 
             // Granatwerfer nur, wenn erlaubt oder schon eingebaut.
             if (!_allowLaunchers && contained == null && !mustFill && slot.ID.StartsWith("mod_launcher"))
@@ -470,6 +524,27 @@ namespace AutomaticWeaponsmith
                     continue;
                 }
 
+                if (part != contained && NeverPickedSights.Contains(part.TemplateId.ToString()))
+                {
+                    continue;
+                }
+
+                if (_noMountStacks && part != contained && part is Mount && slot.ParentItem is Mount && !slot.Required)
+                {
+                    continue;
+                }
+
+                if (part != contained && ConflictsWithWeapon(part))
+                {
+                    continue;
+                }
+
+                // Visiere werden nie nur wegen der Werte verbaut, sondern nur, wenn die Visier-Regel sie verlangt.
+                if (SightRank(part) > 0 && part != contained && !slot.Required && !(SightRuleActive && IsRequiredSight(part)))
+                {
+                    continue;
+                }
+
                 bool isContained = part == contained;
                 Purchase purchase = SourceOf(part);
                 if (purchase.Source == PartSource.Unavailable && !isContained)
@@ -489,7 +564,7 @@ namespace AutomaticWeaponsmith
                     continue;
                 }
 
-                for (int m = 0; m < 4; m++)
+                for (int m = 0; m < result.Best.Length; m++)
                 {
                     var o = option.Best[m];
                     if (o != null && (result.Best[m] == null || IsBetter(o, result.Best[m])))
@@ -508,6 +583,7 @@ namespace AutomaticWeaponsmith
             if (result.Any == null && !slot.Required)
             {
                 result.Any = empty;
+                result.Best[NoAddedSightIndex] = empty;
             }
             if (result.Any == null)
             {
@@ -561,8 +637,21 @@ namespace AutomaticWeaponsmith
             // etwas tragen. Ausnahme: Sie steckt jetzt schon so im Build.
             bool mountMustCarry = part is Mount && !isContained;
 
+            int ownMask = Provides(part);
+            if (SightRank(part) > 0)
+            {
+                if (!isContained && !slot.Required)
+                {
+                    ownMask |= AddedSightBit;
+                }
+                else if (SightRuleActive && IsRequiredSight(part))
+                {
+                    ownMask |= KeptSightBit;
+                }
+            }
+
             var option = new SlotResult();
-            foreach (var kv in Combine(childResults, Provides(part)))
+            foreach (var kv in Combine(childResults, ownMask))
             {
                 if (mountMustCarry && (kv.Key & FilledBit) == 0)
                 {
@@ -576,16 +665,16 @@ namespace AutomaticWeaponsmith
                     Source = purchase.Source,
                     PartPrice = purchase.Price,
                     Offer = purchase.Offer,
-                    Mask = kv.Key & (SightBit | LightBit),
+                    Mask = kv.Key & ~FilledBit,
                     Children = sum.Children,
                     Ergonomics = ownErgo + sum.Ergonomics,
                     Recoil = ownRecoil + sum.Recoil,
                     Purchases = ownPurchases + sum.Purchases,
                     Cost = purchase.Price + sum.Cost
                 };
-                for (int m = 0; m < 4; m++)
+                for (int m = 0; m < option.Best.Length; m++)
                 {
-                    if ((choice.Mask & m) == m && (option.Best[m] == null || IsBetter(choice, option.Best[m])))
+                    if (Qualifies(choice, m) && (option.Best[m] == null || IsBetter(choice, option.Best[m])))
                     {
                         option.Best[m] = choice;
                     }

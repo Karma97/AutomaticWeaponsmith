@@ -50,6 +50,7 @@ namespace AutomaticWeaponsmith.Patches
             var modeButtons = new List<GameObject>();
             var main = CreateButton(__instance, ButtonName, MainLabelKey, keepIcon: true);
             UseAssembleIcon(__instance, main);
+            var progressBar = AddProgressBar(main);
 
             main.GetComponent<Button>().onClick.AddListener(() =>
             {
@@ -68,16 +69,27 @@ namespace AutomaticWeaponsmith.Patches
                 {
                     SetOpen(main, modeButtons, false);
                     Plugin.Log.LogInfo($"Auto build started, mode {mode}.");
-                    ApplyLabel(main.transform, Lang.T("button.calculating"));
                     main.GetComponent<Button>().interactable = false;
+                    bool running = true;
+                    var progress = new System.Progress<(float Fraction, string Text)>(p =>
+                    {
+                        if (running && main != null)
+                        {
+                            SetProgress(progressBar, p.Fraction);
+                            ApplyLabel(main.transform, p.Text);
+                        }
+                    });
+                    SetProgress(progressBar, 0.1f);
                     try
                     {
-                        await OptimizerRunner.RunAsync(__instance, mode);
+                        await OptimizerRunner.RunAsync(__instance, mode, progress);
                     }
                     finally
                     {
+                        running = false;
                         if (main != null)
                         {
+                            progressBar.gameObject.SetActive(false);
                             main.GetComponent<Button>().interactable = true;
                             ApplyLabel(main.transform, Lang.T(MainLabelKey));
                         }
@@ -151,6 +163,31 @@ namespace AutomaticWeaponsmith.Patches
             {
                 Plugin.Log.LogInfo("No icon found on the ASSEMBLE button, using the magnifier icon.");
             }
+        }
+
+        // Halbtransparente Fläche über dem Button, die sich von links füllt. Die Schrift bleibt dadurch lesbar.
+        private static RectTransform AddProgressBar(GameObject button)
+        {
+            var bar = new GameObject("ProgressBar", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            bar.transform.SetParent(button.transform, false);
+            var rect = (RectTransform)bar.transform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.up;
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            var image = bar.GetComponent<Image>();
+            image.color = new Color(Accent.r, Accent.g, Accent.b, 0.35f);
+            image.raycastTarget = false;
+            bar.SetActive(false);
+            return rect;
+        }
+
+        private static void SetProgress(RectTransform bar, float fraction)
+        {
+            bar.gameObject.SetActive(true);
+            bar.anchorMax = new Vector2(Mathf.Clamp01(fraction), 1f);
+            bar.offsetMax = Vector2.zero;
         }
 
         // Schmaler heller Streifen links: zeigt, dass die Modus-Buttons zu AUTO BUILD gehören.

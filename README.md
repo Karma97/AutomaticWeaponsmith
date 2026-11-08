@@ -6,7 +6,7 @@ Automatic Weaponsmith adds an **AUTO BUILD** button to the weapon builds screen.
 
 ## Requirements
 
-- SPT 4.1.6
+- SPT 4.1.5 or newer 4.1.x (tested on 4.1.6)
 
 ## Installation
 
@@ -38,8 +38,10 @@ Automatic Weaponsmith adds an **AUTO BUILD** button to the weapon builds screen.
 - **Stash first**: parts you already own are free, so they are preferred.
 - **Always an optic**: the build always gets a red dot, holo or scope. If you already have one on your weapon, it stays. Iron sights are never used.
 - **Always a flashlight**: the build always gets a real flashlight (a lamp with white light, not just a laser).
+- **No Axion Kobra EKP sights**: the mod never picks them. If you put one on your weapon yourself, it stays.
+- **Sensible optics**: a new optic comes from a ranked list (`optics.txt`, mini red dots first) instead of being picked by stats, and it sits on one mount, not a stack of mounts. You can edit the list.
 - **Usable magazine**: the magazine is at least as big as the one on your weapon.
-- **No useless parts**: no empty mounts, and ergonomics above 100 is not wasted.
+- **No useless parts**: no empty mounts, no extra sights just for better stats, and ergonomics above 100 is not wasted.
 - **Fitting parts only**: parts that do not work together are never combined.
 
 ## Settings
@@ -50,9 +52,9 @@ Press **F12** in the game to open the settings (this needs the BepInEx Configura
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| Always use an optic (no iron sights) | On | Always add a red dot, holo or scope. |
+| Always use an optic (no iron sights) | On | Always add one red dot, holo or scope. Off = no sight is added. |
 | Always add a flashlight | On | Always add a flashlight. |
-| Sight | Keep | **Keep**: your current sight stays. **SameType**: any sight of the same type. **Any**: no rule. |
+| Sight | Keep | **Keep**: your current sight stays. **SameType**: any sight of the same type. **Any**: no rule. If "Always use an optic" is also off, sights are removed. |
 | Minimum magazine size | 30 | Only used if your weapon has no magazine. |
 | Minimum ergonomics (Recoil mode) | 40 | Recoil mode will not go below this. 0 = off. |
 | Recoil weight (Balanced mode) | 1.0 | Higher = Balanced mode cares more about recoil. |

@@ -40,7 +40,11 @@ namespace AutomaticWeaponsmith
             public Dictionary<string, List<SlotChoice>> Cache = new Dictionary<string, List<SlotChoice>>();
         }
 
-        public static async Task RunAsync(EditBuildScreen screen, OptimizeMode mode)
+        private const int MaxFleaRounds = 8;
+
+        // progress bekommt Füllstand (0-1) und Text für den Button. Darf auch aus dem Rechen-Thread gemeldet werden,
+        // Progress<T> reicht das an den Spiel-Thread weiter.
+        public static async Task RunAsync(EditBuildScreen screen, OptimizeMode mode, IProgress<(float Fraction, string Text)> progress)
         {
             if (Busy)
             {
@@ -63,6 +67,7 @@ namespace AutomaticWeaponsmith
                 PriceData prices = null;
                 try
                 {
+                    progress.Report((0.1f, Lang.T("button.loading_prices")));
                     prices = await PriceService.Load(session, Plugin.AllowBarter.Value);
                 }
                 catch (Exception ex)
@@ -114,21 +119,56 @@ namespace AutomaticWeaponsmith
                 Dictionary<SlotChoice, Purchase> purchases = null;
                 var notOnFlea = new List<string>();
 
-                for (int round = 0; round < 3; round++)
+                // Jede Runde sperrt Teile ohne Angebot. Reicht das nicht, zählen zum Schluss nur noch Händler und Stash,
+                // damit kein ungeprüftes Flohmarkt-Teil im Ergebnis bleibt.
+                bool useFlea = fleaAvailable;
+                bool fleaGivenUp = false;
+
+                // Ab der zweiten Runde zeigt der Button "neu rechnen" statt der einzelnen Schritte.
+                int currentRound = 0;
+                Action<float, string> stage = (fraction, key) => progress.Report((fraction, currentRound > 0
+                    ? Lang.T("button.recalculating", ("round", currentRound + 1))
+                    : Lang.T(key)));
+                for (int round = 0; round < MaxFleaRounds + 1; round++)
                 {
+                    currentRound = round;
                     var roundNotes = new List<string>();
                     await Task.Run(() =>
                     {
-                        run = NewRun(weapon, manipulation, index, stash, fleaAvailable, sightRank, minMagazine, exactSight, prices, watch);
-                        result = SolveForMode(run, mode, roundNotes);
-
-                        // Passt das aktuelle Visier nicht auf den besten Build, dann eins derselben Art nehmen.
-                        if (exactSight.HasValue && (result == null || !result.Any(run.Optimizer.ContainsSight)))
+                        // Vorhandenes Visier behalten, wenn es passt.
+                        bool sightSettled = false;
+                        if (exactSight.HasValue)
                         {
-                            run = NewRun(weapon, manipulation, index, stash, fleaAvailable, sightRank, minMagazine, null, prices, watch);
-                            roundNotes.Clear();
+                            stage(0.55f, "button.calculating");
+                            run = NewRun(weapon, manipulation, index, stash, useFlea, sightRank, minMagazine, exactSight, prices, watch);
                             result = SolveForMode(run, mode, roundNotes);
-                            roundNotes.Add(Lang.T("note.sight_replaced", ("sight", sightName)));
+                            sightSettled = result != null && result.Any(run.Optimizer.ContainsSight);
+                        }
+
+                        if (!sightSettled)
+                        {
+                            bool sightFailed = exactSight.HasValue;
+                            roundNotes.Clear();
+
+                            // Neue Optik: die erste aus der Liste, die passt. Sonst wie bisher irgendeine ausreichende.
+                            if (alwaysOptic && PickFromList(weapon, manipulation, index, stash, useFlea, sightRank, minMagazine, prices,
+                                    watch, mode, stage, out var listRun, out var listResult, out var listNotes))
+                            {
+                                run = listRun;
+                                result = listResult;
+                                roundNotes.AddRange(listNotes);
+                            }
+                            else
+                            {
+                                stage(0.55f, "button.calculating");
+                                run = NewRun(weapon, manipulation, index, stash, useFlea, sightRank, minMagazine, null, prices, watch,
+                                    noMountStacks: !alwaysOptic);
+                                result = SolveForMode(run, mode, roundNotes);
+                            }
+                            if (sightFailed)
+                            {
+                                roundNotes.Add(Lang.T("note.sight_replaced", ("sight", sightName)));
+                            }
                         }
 
                         // Budget einhalten (nur wenn eingeschaltet). Im Rückstoß-Modus gilt dabei weiter die Mindest-Ergonomie.
@@ -145,12 +185,13 @@ namespace AutomaticWeaponsmith
                     }
 
                     purchases = AssignPurchases(result, stash, run.Optimizer);
-                    if (prices == null || !fleaAvailable)
+                    if (prices == null || !useFlea)
                     {
                         break;
                     }
 
                     var fleaParts = purchases.Where(p => p.Value.Source == PartSource.Flea).Select(p => p.Key.Part).ToList();
+                    stage(0.85f, "button.checking_flea");
                     var blocked = await PriceService.CheckFleaOffers(session, prices, fleaParts.Select(p => p.TemplateId.ToString()),
                         Plugin.AllowBarter.Value);
                     if (blocked.Count == 0)
@@ -158,7 +199,22 @@ namespace AutomaticWeaponsmith
                         break;
                     }
                     notOnFlea.AddRange(fleaParts.Where(p => blocked.Contains(p.TemplateId.ToString())).Select(Name));
-                    Plugin.Log.LogInfo($"Currently not on the flea market: {string.Join(", ", notOnFlea)}. Recalculating.");
+                    Plugin.Log.LogInfo($"Currently not on the flea market: {string.Join(", ", notOnFlea.Distinct())}. Recalculating.");
+
+                    // Gleichnamige Varianten (z. B. andere Farben) gleich mitprüfen, sonst kostet jede Variante eine ganze Runde.
+                    var variants = purchases
+                        .Where(p => p.Value.Source == PartSource.Flea && blocked.Contains(p.Key.Part.TemplateId.ToString()))
+                        .SelectMany(p => index.Candidates(p.Key.Slot).Where(c => Name(c) == Name(p.Key.Part)))
+                        .Select(c => c.TemplateId.ToString())
+                        .ToList();
+                    await PriceService.CheckFleaOffers(session, prices, variants, Plugin.AllowBarter.Value);
+
+                    if (round == MaxFleaRounds - 1)
+                    {
+                        useFlea = false;
+                        fleaGivenUp = true;
+                        Plugin.Log.LogInfo("Too many parts without flea offers, using only traders and stash.");
+                    }
                 }
                 watch.Stop();
 
@@ -188,13 +244,17 @@ namespace AutomaticWeaponsmith
                 {
                     notes.Add(Lang.T("note.no_flashlight"));
                 }
-                if (notOnFlea.Count > 0)
+                if (fleaGivenUp)
+                {
+                    notes.Add(Lang.T("note.flea_given_up"));
+                }
+                else if (notOnFlea.Count > 0)
                 {
                     notes.Add(Lang.T("note.not_on_flea", ("parts", string.Join(", ", notOnFlea.Distinct()))));
                 }
 
                 // Preise mit den echten Flohmarkt-Angeboten neu zuordnen (frischer Optimierer = keine alten Preise im Speicher).
-                var priced = NewRun(weapon, manipulation, index, stash, fleaAvailable, sightRank, minMagazine, exactSight, prices, watch);
+                var priced = NewRun(weapon, manipulation, index, stash, useFlea, sightRank, minMagazine, exactSight, prices, watch);
                 purchases = AssignPurchases(result, stash, priced.Optimizer);
                 Plugin.Log.LogInfo("\n" + Describe(weapon, mode, fleaAvailable, prices, result, purchases, run, notes, priceMs));
 
@@ -508,16 +568,58 @@ namespace AutomaticWeaponsmith
         }
 
         private static Run_ NewRun(Weapon weapon, EditBuildManipulation manipulation, PartIndex index, Dictionary<MongoID, int> stash,
-            bool fleaAvailable, int sightRank, int minMagazine, MongoID? exactSight, PriceData prices, Stopwatch watch)
+            bool fleaAvailable, int sightRank, int minMagazine, MongoID? exactSight, PriceData prices, Stopwatch watch,
+            bool noMountStacks = true)
         {
             return new Run_
             {
                 Weapon = weapon,
                 Optimizer = new BuildOptimizer(manipulation, index, stash, fleaAvailable, Plugin.AllowLaunchers.Value,
-                    sightRank, minMagazine, exactSight, prices, Plugin.RequireLight.Value, Plugin.AlwaysOptic.Value),
+                    sightRank, minMagazine, exactSight, prices, Plugin.RequireLight.Value, Plugin.AlwaysOptic.Value, noMountStacks),
                 Watch = watch,
                 LimitMs = Plugin.TimeLimitMs.Value
             };
+        }
+
+        // Geht die Optik-Liste von oben nach unten durch und nimmt die erste, die auf die Waffe passt und zu bekommen ist.
+        // Erst ohne Halterungs-Stapel. Nur wenn das für keine Optik klappt, sind Stapel erlaubt.
+        private static bool PickFromList(Weapon weapon, EditBuildManipulation manipulation, PartIndex index, Dictionary<MongoID, int> stash,
+            bool fleaAvailable, int sightRank, int minMagazine, PriceData prices, Stopwatch watch, OptimizeMode mode,
+            Action<float, string> stage, out Run_ run, out List<SlotChoice> result, out List<string> notes)
+        {
+            stage(0.3f, "button.choosing_optic");
+            foreach (bool noMountStacks in new[] { true, false })
+            {
+                foreach (string id in OpticList.Ids)
+                {
+                    var optic = new MongoID(id);
+                    var trial = NewRun(weapon, manipulation, index, stash, fleaAvailable, sightRank, minMagazine, optic, prices, watch, noMountStacks);
+
+                    // Schneller Vorab-Test mit einem einzigen Rechenlauf: Passt die Optik überhaupt?
+                    var first = trial.Optimizer.Solve(weapon, new Weights(1f, 1f), new HashSet<MongoID>());
+                    var part = first.SelectMany(c => c.Flatten()).FirstOrDefault(c => c.Part != null && c.Part.TemplateId == optic)?.Part;
+                    if (trial.Optimizer.SightRequirementFailed || part == null || BuildOptimizer.SightRank(part) < sightRank)
+                    {
+                        continue;
+                    }
+
+                    stage(0.55f, "button.calculating");
+                    var trialNotes = new List<string>();
+                    var full = SolveForMode(trial, mode, trialNotes);
+                    if (full != null && full.Any(trial.Optimizer.ContainsSight))
+                    {
+                        Plugin.Log.LogInfo($"Optic from the list: {Name(part)} (mount stacks {(noMountStacks ? "off" : "on")}).");
+                        run = trial;
+                        result = full;
+                        notes = trialNotes;
+                        return true;
+                    }
+                }
+            }
+            run = null;
+            result = null;
+            notes = null;
+            return false;
         }
 
         // Das "beste" Visier, das gerade in der Waffe steckt (Zielfernrohr vor Rotpunkt vor Kimme/Korn).

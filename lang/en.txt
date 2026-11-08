@@ -14,7 +14,11 @@
 
 # Buttons
 button.main = AUTO BUILD
+button.loading_prices = LOADING PRICES ...
+button.choosing_optic = CHOOSING OPTIC ...
 button.calculating = CALCULATING ...
+button.checking_flea = CHECKING FLEA ...
+button.recalculating = RECALCULATING ({round}) ...
 button.recoil = RECOIL
 button.ergonomics = ERGONOMICS
 button.balanced = BALANCED
@@ -41,11 +45,12 @@ preview.yes = YES = keep this build (buy and assemble with ASSEMBLE or FIND PART
 preview.no = NO = undo
 
 # Notes in the build window
-note.sight_replaced = Your sight {sight} did not fit, replaced with one of the same type.
+note.sight_replaced = Your sight {sight} did not fit, so a different one was chosen.
 note.no_optic = No fitting optic found for this weapon.
 note.iron_replaced = Iron sights ({sight}) replaced with an optic.
 note.no_flashlight = No fitting flashlight found for this weapon.
 note.not_on_flea = Currently not on the flea market, so replaced: {parts}.
+note.flea_given_up = Many parts have no flea market offers right now, so only trader and stash parts are used.
 note.budget_kept = Budget of {budget} ₽ kept (without budget: {cost} ₽).
 note.budget_kept_low_ergo = Budget of {budget} ₽ kept (without budget: {cost} ₽), but the minimum ergonomics could not be reached.
 note.budget_impossible = Budget of {budget} ₽ is not possible, the cheapest build costs {cost} ₽.
@@ -67,11 +72,11 @@ setting.min_ergo.desc = In Recoil mode, ergonomics will not go below this value.
 setting.launchers.name = Allow grenade launchers
 setting.launchers.desc = Allow underbarrel grenade launchers (much less recoil, but very heavy).
 setting.sight.name = Sight
-setting.sight.desc = Keep = your current sight stays on the weapon (if it does not fit, one of the same type is used). SameType = any sight of the same type (scope / red dot / iron sights). Any = no rule.
+setting.sight.desc = Keep = your current sight stays on the weapon (if it does not fit, one of the same type is used). SameType = any sight of the same type (scope / red dot / iron sights). Any = no rule: if "Always use an optic" is off too, sights are removed.
 setting.min_mag.name = Minimum magazine size
 setting.min_mag.desc = Only used if the build has no magazine. Otherwise the magazine is at least as big as the current one.
 setting.always_optic.name = Always use an optic (no iron sights)
-setting.always_optic.desc = On = the build always gets a red dot, holo or scope. Iron sights (and carry handles) are never used.
+setting.always_optic.desc = On = the build always gets one red dot, holo or scope. A new one comes from the list in optics.txt. Iron sights (and carry handles) are never used. Off = no sight is added, only your current one follows the Sight setting.
 setting.flashlight.name = Always add a flashlight
 setting.flashlight.desc = On = the build always gets a flashlight (a flashlight or a tactical device with a white light).
 setting.barter.name = Allow barter trades

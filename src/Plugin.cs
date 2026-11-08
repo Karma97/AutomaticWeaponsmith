@@ -15,8 +15,8 @@ namespace AutomaticWeaponsmith
     }
 
     // Einstiegspunkt: BepInEx findet diese Klasse automatisch und ruft Awake() beim Spielstart auf.
-    [BepInPlugin("com.automaticweaponsmith", "AutomaticWeaponsmith", "1.0.1")]
-    [BepInDependency("com.SPT.core", "4.1.6")]
+    [BepInPlugin("com.automaticweaponsmith", "AutomaticWeaponsmith", "1.0.2")]
+    [BepInDependency("com.SPT.core", "4.1.5")]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource Log;
@@ -41,6 +41,7 @@ namespace AutomaticWeaponsmith
 
             // Sprache zuerst: Die Texte im Einstellungsmenü kommen schon aus der Sprachdatei.
             Lang.Init(Path.GetDirectoryName(Info.Location));
+            OpticList.Load(Path.GetDirectoryName(Info.Location));
             Language = Config.Bind("General", "Language", Lang.Default,
                 new ConfigDescription("Language of the mod. Files are in the lang folder of this mod. Restart the game to also change the names in this menu.",
                     new AcceptableValueList<string>(Lang.Available())));
