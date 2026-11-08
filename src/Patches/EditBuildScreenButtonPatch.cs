@@ -16,18 +16,18 @@ namespace AutomaticWeaponsmith.Patches
     public class EditBuildScreenButtonPatch : ModulePatch
     {
         internal const string ButtonName = "AutomaticWeaponsmithButton";
-        internal const string MainLabel = "AUTO BUILD";
+        internal const string MainLabelKey = "button.main";
         internal const float SubIndent = 14f;
 
         // Akzentfarbe wie die hellen Tarkov-Texte (beige).
         private static readonly Color Accent = new Color(0.77f, 0.76f, 0.70f, 1f);
 
         // Modus-Buttons, die beim Klick auf AUTO BUILD unter dem Button aufklappen.
-        internal static readonly (string Name, string Label, OptimizeMode Mode)[] ModeButtons =
+        internal static readonly (string Name, string LabelKey, OptimizeMode Mode)[] ModeButtons =
         {
-            ("AutomaticWeaponsmithModeRecoil", "RECOIL", OptimizeMode.Recoil),
-            ("AutomaticWeaponsmithModeErgo", "ERGONOMICS", OptimizeMode.Ergonomics),
-            ("AutomaticWeaponsmithModeBalanced", "BALANCED", OptimizeMode.Balanced)
+            ("AutomaticWeaponsmithModeRecoil", "button.recoil", OptimizeMode.Recoil),
+            ("AutomaticWeaponsmithModeErgo", "button.ergonomics", OptimizeMode.Ergonomics),
+            ("AutomaticWeaponsmithModeBalanced", "button.balanced", OptimizeMode.Balanced)
         };
 
         private static readonly Dictionary<string, string> Labels = new Dictionary<string, string>();
@@ -48,7 +48,7 @@ namespace AutomaticWeaponsmith.Patches
             }
 
             var modeButtons = new List<GameObject>();
-            var main = CreateButton(__instance, ButtonName, MainLabel, keepIcon: true);
+            var main = CreateButton(__instance, ButtonName, MainLabelKey, keepIcon: true);
             UseAssembleIcon(__instance, main);
 
             main.GetComponent<Button>().onClick.AddListener(() =>
@@ -60,15 +60,15 @@ namespace AutomaticWeaponsmith.Patches
                 SetOpen(main, modeButtons, !modeButtons[0].activeSelf);
             });
 
-            foreach (var (name, label, mode) in ModeButtons)
+            foreach (var (name, labelKey, mode) in ModeButtons)
             {
-                var go = CreateButton(__instance, name, label, keepIcon: false);
+                var go = CreateButton(__instance, name, labelKey, keepIcon: false);
                 AddAccentBar(go);
                 go.GetComponent<Button>().onClick.AddListener(async () =>
                 {
                     SetOpen(main, modeButtons, false);
                     Plugin.Log.LogInfo($"Auto build started, mode {mode}.");
-                    ApplyLabel(main.transform, "CALCULATING ...");
+                    ApplyLabel(main.transform, Lang.T("button.calculating"));
                     main.GetComponent<Button>().interactable = false;
                     try
                     {
@@ -79,7 +79,7 @@ namespace AutomaticWeaponsmith.Patches
                         if (main != null)
                         {
                             main.GetComponent<Button>().interactable = true;
-                            ApplyLabel(main.transform, MainLabel);
+                            ApplyLabel(main.transform, Lang.T(MainLabelKey));
                         }
                     }
                 });
@@ -96,19 +96,19 @@ namespace AutomaticWeaponsmith.Patches
                 b.SetActive(open);
                 if (open)
                 {
-                    ApplyLabel(b.transform, Labels[b.name]);
+                    ApplyLabel(b.transform, Lang.T(Labels[b.name]));
                 }
             }
-            ApplyLabel(main.transform, open ? MainLabel + "  <" : MainLabel);
+            ApplyLabel(main.transform, open ? Lang.T(MainLabelKey) + "  <" : Lang.T(MainLabelKey));
         }
 
         // Kopie des FIND-PARTS-Buttons, damit er wie die Liste links oben aussieht.
         // Klick-Funktionen von FIND PARTS werden dabei NICHT mitkopiert.
-        private static GameObject CreateButton(EditBuildScreen screen, string name, string label, bool keepIcon)
+        private static GameObject CreateButton(EditBuildScreen screen, string name, string labelKey, bool keepIcon)
         {
             GameObject go = Object.Instantiate(screen._findPartsButton.gameObject, screen.transform, false);
             go.name = name;
-            Labels[name] = label;
+            Labels[name] = labelKey;
 
             var layout = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>();
             layout.ignoreLayout = true;
@@ -125,7 +125,7 @@ namespace AutomaticWeaponsmith.Patches
                 icon.gameObject.SetActive(keepIcon);
             }
 
-            ApplyLabel(go.transform, label);
+            ApplyLabel(go.transform, Lang.T(labelKey));
             return go;
         }
 
@@ -224,7 +224,7 @@ namespace AutomaticWeaponsmith.Patches
             // 40 px Abstand, damit die Beschriftung/Hovertexte der Icon-Buttons frei bleiben.
             float scale = rect.lossyScale.x;
             Place(rect, left, bottom - 40f * rect.lossyScale.y, width);
-            EditBuildScreenButtonPatch.ApplyLabel(rect, EditBuildScreenButtonPatch.MainLabel);
+            EditBuildScreenButtonPatch.ApplyLabel(rect, Lang.T(EditBuildScreenButtonPatch.MainLabelKey));
 
             // Modus-Buttons eingerückt untereinander, eingeklappt.
             float step = (rect.rect.height + 3f) * rect.lossyScale.y;

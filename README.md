@@ -74,6 +74,16 @@ Press **F12** in the game to open the settings (this needs the BepInEx Configura
 - Prices are loaded when you click a mode and are kept for 5 minutes.
 - If something goes wrong, check `BepInEx\LogOutput.log`. The mod writes the full build and all prices there.
 
+## Translating
+
+All texts are in `BepInEx\plugins\AutomaticWeaponsmith\lang\en.txt`.
+
+1. Copy `en.txt` and name the copy after your language, for example `zh.txt`.
+2. Translate the text to the right of each `=` sign and save the file as UTF-8. The instructions are at the top of the file.
+3. Start the game, press **F12** and choose your file under **Language**.
+
+You do not need to change any code. Lines you have not translated are shown in English.
+
 ## Uninstall
 
 Delete the folder `BepInEx\plugins\AutomaticWeaponsmith`.

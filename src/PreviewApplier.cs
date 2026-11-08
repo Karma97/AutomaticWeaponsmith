@@ -73,7 +73,7 @@ namespace AutomaticWeaponsmith
                     screen.UpdateItem(original);
                     Plugin.Log.LogInfo("Build undone.");
                 },
-                caption: "AUTO BUILD",
+                caption: Lang.T(Patches.EditBuildScreenButtonPatch.MainLabelKey),
                 alignment: TextAlignmentOptions.Left);
         }
 
@@ -145,34 +145,34 @@ namespace AutomaticWeaponsmith
             List<string> errors)
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"Mode: {ModeName(mode)}");
+            sb.AppendLine(Lang.T("preview.mode", ("mode", ModeName(mode))));
             sb.AppendLine();
-            sb.AppendLine($"Ergonomics:        {ergoBefore:0.#}  ->  {ergoAfter:0.#}");
-            sb.AppendLine($"Vertical recoil:   {vertBefore:0}  ->  {vertAfter:0}");
-            sb.AppendLine($"Horizontal recoil: {horBefore:0}  ->  {horAfter:0}");
+            sb.AppendLine(Lang.T("preview.ergonomics", ("before", ergoBefore.ToString("0.#")), ("after", ergoAfter.ToString("0.#"))));
+            sb.AppendLine(Lang.T("preview.vertical", ("before", vertBefore.ToString("0")), ("after", vertAfter.ToString("0"))));
+            sb.AppendLine(Lang.T("preview.horizontal", ("before", horBefore.ToString("0")), ("after", horAfter.ToString("0"))));
             sb.AppendLine();
 
             int fromStash = purchases.Count(p => p.Value.Source == PartSource.Stash);
-            sb.AppendLine($"From your stash: {fromStash} {(fromStash == 1 ? "part" : "parts")}");
+            sb.AppendLine(Lang.T(fromStash == 1 ? "preview.stash_one" : "preview.stash_many", ("count", fromStash)));
 
             // Händler (Bargeld), Flohmarkt, Tausch jeweils als eigene Zeile mit Summe.
             var cash = purchases.Where(p => p.Value.Source == PartSource.Trader && p.Value.Offer?.IsBarter != true).ToList();
             var barter = purchases.Where(p => p.Value.Source == PartSource.Trader && p.Value.Offer?.IsBarter == true).ToList();
             var flea = purchases.Where(p => p.Value.Source == PartSource.Flea).ToList();
             var missing = purchases.Where(p => p.Value.Source == PartSource.Unavailable).ToList();
-            AppendGroup(sb, "Traders", cash);
-            AppendGroup(sb, "Flea market", flea);
+            AppendGroup(sb, Lang.T("preview.traders"), cash);
+            AppendGroup(sb, Lang.T("preview.flea"), flea);
             foreach (var b in barter)
             {
-                sb.AppendLine($"Barter at {b.Value.Offer.TraderName}: {Name(b.Key.Part)} for {b.Value.Offer.BarterText}");
+                sb.AppendLine(Lang.T("preview.barter", ("trader", b.Value.Offer.TraderName), ("part", Name(b.Key.Part)), ("items", b.Value.Offer.BarterText)));
             }
             if (missing.Count > 0)
             {
-                sb.AppendLine($"Not available: {string.Join(", ", missing.Select(m => Name(m.Key.Part)))}");
+                sb.AppendLine(Lang.T("preview.not_available", ("parts", string.Join(", ", missing.Select(m => Name(m.Key.Part))))));
             }
 
             sb.AppendLine();
-            sb.AppendLine($"Total cost: about {purchases.Values.Sum(p => p.Price):N0} ₽" + (barter.Count > 0 ? " (barter estimated)" : ""));
+            sb.AppendLine(Lang.T(barter.Count > 0 ? "preview.total_barter" : "preview.total", ("cost", purchases.Values.Sum(p => p.Price).ToString("N0"))));
 
             foreach (var note in notes)
             {
@@ -182,12 +182,12 @@ namespace AutomaticWeaponsmith
             if (errors.Count > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine($"{errors.Count} part(s) could not be attached, see the log for details.");
+                sb.AppendLine(Lang.T("preview.errors", ("count", errors.Count)));
             }
 
             sb.AppendLine();
-            sb.AppendLine("YES = keep this build (buy and assemble with ASSEMBLE or FIND PARTS)");
-            sb.AppendLine("NO = undo");
+            sb.AppendLine(Lang.T("preview.yes"));
+            sb.AppendLine(Lang.T("preview.no"));
             return sb.ToString();
         }
 
@@ -199,9 +199,9 @@ namespace AutomaticWeaponsmith
         {
             switch (mode)
             {
-                case OptimizeMode.Recoil: return "Recoil";
-                case OptimizeMode.Ergonomics: return "Ergonomics";
-                default: return "Balanced";
+                case OptimizeMode.Recoil: return Lang.T("mode.recoil");
+                case OptimizeMode.Ergonomics: return Lang.T("mode.ergonomics");
+                default: return Lang.T("mode.balanced");
             }
         }
 
@@ -213,7 +213,7 @@ namespace AutomaticWeaponsmith
             }
             var names = group.Select(p => Name(p.Key.Part)).GroupBy(n => n)
                 .Select(g => g.Count() > 1 ? $"{g.Key} x{g.Count()}" : g.Key);
-            sb.AppendLine($"{title} ({group.Count}, {group.Sum(p => p.Value.Price):N0} ₽): {string.Join(", ", names)}");
+            sb.AppendLine(Lang.T("preview.group", ("source", title), ("count", group.Count), ("cost", group.Sum(p => p.Value.Price).ToString("N0")), ("parts", string.Join(", ", names))));
         }
     }
 }

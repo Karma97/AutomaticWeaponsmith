@@ -128,7 +128,7 @@ namespace AutomaticWeaponsmith
                             run = NewRun(weapon, manipulation, index, stash, fleaAvailable, sightRank, minMagazine, null, prices, watch);
                             roundNotes.Clear();
                             result = SolveForMode(run, mode, roundNotes);
-                            roundNotes.Add($"Your sight {sightName} did not fit, replaced with one of the same type.");
+                            roundNotes.Add(Lang.T("note.sight_replaced", ("sight", sightName)));
                         }
 
                         // Budget einhalten (nur wenn eingeschaltet). Im Rückstoß-Modus gilt dabei weiter die Mindest-Ergonomie.
@@ -178,19 +178,19 @@ namespace AutomaticWeaponsmith
                 notes.InsertRange(0, StatNotes(weapon, mode, result, minErgo));
                 if (alwaysOptic && !result.Any(run.Optimizer.ContainsSight))
                 {
-                    notes.Add("No fitting optic found for this weapon.");
+                    notes.Add(Lang.T("note.no_optic"));
                 }
                 else if (replacingIronSight)
                 {
-                    notes.Add($"Iron sights ({sightName}) replaced with an optic.");
+                    notes.Add(Lang.T("note.iron_replaced", ("sight", sightName)));
                 }
                 if (Plugin.RequireLight.Value && !result.Any(run.Optimizer.ContainsLight))
                 {
-                    notes.Add("No fitting flashlight found for this weapon.");
+                    notes.Add(Lang.T("note.no_flashlight"));
                 }
                 if (notOnFlea.Count > 0)
                 {
-                    notes.Add($"Currently not on the flea market, so replaced: {string.Join(", ", notOnFlea.Distinct())}.");
+                    notes.Add(Lang.T("note.not_on_flea", ("parts", string.Join(", ", notOnFlea.Distinct()))));
                 }
 
                 // Preise mit den echten Flohmarkt-Angeboten neu zuordnen (frischer Optimierer = keine alten Preise im Speicher).
@@ -348,7 +348,7 @@ namespace AutomaticWeaponsmith
                     {
                         final = affordable;
                     }
-                    notes.Add($"Budget of {budget:N0} ₽ kept (without budget: {cost:N0} ₽).");
+                    notes.Add(Lang.T("note.budget_kept", ("budget", budget.ToString("N0")), ("cost", cost.ToString("N0"))));
                     return final;
                 }
                 if (ergoWeight >= 20f)
@@ -359,13 +359,13 @@ namespace AutomaticWeaponsmith
 
             if (lastAffordable != null)
             {
-                notes.Add($"Budget of {budget:N0} ₽ kept (without budget: {cost:N0} ₽), but the minimum ergonomics could not be reached.");
+                notes.Add(Lang.T("note.budget_kept_low_ergo", ("budget", budget.ToString("N0")), ("cost", cost.ToString("N0"))));
                 return lastAffordable;
             }
 
             var cheapest = Greedy(run, baseWeights.WithCost(10f), new HashSet<MongoID>());
             float cheapestCost = cheapest == null ? cost : TotalCost(cheapest, stash, run.Optimizer);
-            notes.Add($"Budget of {budget:N0} ₽ is not possible, the cheapest build costs {cheapestCost:N0} ₽.");
+            notes.Add(Lang.T("note.budget_impossible", ("budget", budget.ToString("N0")), ("cost", cheapestCost.ToString("N0"))));
             return cheapest ?? result;
         }
 
@@ -407,12 +407,12 @@ namespace AutomaticWeaponsmith
             if (mode == OptimizeMode.Recoil && minErgo != null)
             {
                 yield return ergo >= minErgo.Value
-                    ? $"Minimum ergonomics of {minErgo:0} kept."
-                    : $"Minimum ergonomics of {minErgo:0} not reached (only {Clamp(ergo):0.#}).";
+                    ? Lang.T("note.min_ergo_kept", ("min", minErgo.Value.ToString("0")))
+                    : Lang.T("note.min_ergo_missed", ("min", minErgo.Value.ToString("0")), ("ergo", Clamp(ergo).ToString("0.#")));
             }
             if (mode == OptimizeMode.Ergonomics && ergo >= 100f)
             {
-                yield return "Ergonomics 100 reached.";
+                yield return Lang.T("note.ergo_100");
             }
         }
 

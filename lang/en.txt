@@ -1,0 +1,82 @@
+# Automatic Weaponsmith - language file
+#
+# How to translate:
+# 1. Copy this file and name the copy after your language, for example zh.txt or de.txt.
+# 2. Keep it in this folder and save it as UTF-8.
+# 3. Translate only the text to the right of the "=" sign. Do not change the name on the left.
+# 4. Keep words in {curly brackets} exactly as they are. The mod fills in the real value there.
+#    You can move them to a different place in the sentence.
+# 5. \n means a new line. Lines that start with # are ignored.
+# 6. Start the game and choose your file in the settings (F12) under "Language".
+#
+# If a line is missing, the mod uses the English text for it. New versions of the mod may add
+# new lines, and the log file (BepInEx\LogOutput.log) tells you how many are missing.
+
+# Buttons
+button.main = AUTO BUILD
+button.calculating = CALCULATING ...
+button.recoil = RECOIL
+button.ergonomics = ERGONOMICS
+button.balanced = BALANCED
+
+# Build window
+mode.recoil = Recoil
+mode.ergonomics = Ergonomics
+mode.balanced = Balanced
+preview.mode = Mode: {mode}
+preview.ergonomics = Ergonomics:        {before}  ->  {after}
+preview.vertical = Vertical recoil:   {before}  ->  {after}
+preview.horizontal = Horizontal recoil: {before}  ->  {after}
+preview.stash_one = From your stash: {count} part
+preview.stash_many = From your stash: {count} parts
+preview.traders = Traders
+preview.flea = Flea market
+preview.group = {source} ({count}, {cost} ₽): {parts}
+preview.barter = Barter at {trader}: {part} for {items}
+preview.not_available = Not available: {parts}
+preview.total = Total cost: about {cost} ₽
+preview.total_barter = Total cost: about {cost} ₽ (barter estimated)
+preview.errors = {count} part(s) could not be attached, see the log for details.
+preview.yes = YES = keep this build (buy and assemble with ASSEMBLE or FIND PARTS)
+preview.no = NO = undo
+
+# Notes in the build window
+note.sight_replaced = Your sight {sight} did not fit, replaced with one of the same type.
+note.no_optic = No fitting optic found for this weapon.
+note.iron_replaced = Iron sights ({sight}) replaced with an optic.
+note.no_flashlight = No fitting flashlight found for this weapon.
+note.not_on_flea = Currently not on the flea market, so replaced: {parts}.
+note.budget_kept = Budget of {budget} ₽ kept (without budget: {cost} ₽).
+note.budget_kept_low_ergo = Budget of {budget} ₽ kept (without budget: {cost} ₽), but the minimum ergonomics could not be reached.
+note.budget_impossible = Budget of {budget} ₽ is not possible, the cheapest build costs {cost} ₽.
+note.min_ergo_kept = Minimum ergonomics of {min} kept.
+note.min_ergo_missed = Minimum ergonomics of {min} not reached (only {ergo}).
+note.ergo_100 = Ergonomics 100 reached.
+
+# Settings menu (F12): sections
+section.optimizer = Optimizer
+section.prices = Prices
+
+# Settings menu (F12): names and descriptions
+setting.recoil_weight.name = Recoil weight (Balanced mode)
+setting.recoil_weight.desc = Balanced mode only: how many ergonomics points 1 % less recoil is worth.
+setting.time_limit.name = Time limit (ms)
+setting.time_limit.desc = After this time, part conflicts are solved quickly instead of perfectly.
+setting.min_ergo.name = Minimum ergonomics (Recoil mode)
+setting.min_ergo.desc = In Recoil mode, ergonomics will not go below this value. 0 = off.
+setting.launchers.name = Allow grenade launchers
+setting.launchers.desc = Allow underbarrel grenade launchers (much less recoil, but very heavy).
+setting.sight.name = Sight
+setting.sight.desc = Keep = your current sight stays on the weapon (if it does not fit, one of the same type is used). SameType = any sight of the same type (scope / red dot / iron sights). Any = no rule.
+setting.min_mag.name = Minimum magazine size
+setting.min_mag.desc = Only used if the build has no magazine. Otherwise the magazine is at least as big as the current one.
+setting.always_optic.name = Always use an optic (no iron sights)
+setting.always_optic.desc = On = the build always gets a red dot, holo or scope. Iron sights (and carry handles) are never used.
+setting.flashlight.name = Always add a flashlight
+setting.flashlight.desc = On = the build always gets a flashlight (a flashlight or a tactical device with a white light).
+setting.barter.name = Allow barter trades
+setting.barter.desc = Also use trader offers that are paid with items instead of money.
+setting.use_budget.name = Use budget limit
+setting.use_budget.desc = On = the build may not cost more than the budget (parts from your stash are free).
+setting.budget.name = Budget (roubles)
+setting.budget.desc = Maximum cost for all parts you need to buy.
